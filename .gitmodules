@@ -1,0 +1,6 @@
+[submodule "vendor/serialport"]
+	path = vendor/serialport
+	url = https://github.com/yksz/serialport.git
+[submodule "vendor/c-logger"]
+	path = vendor/c-logger
+	url = https://github.com/yksz/c-logger.git
