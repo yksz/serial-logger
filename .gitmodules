@@ -1,0 +1,6 @@
+[submodule "vendor/serialport"]
+	path = vendor/serialport
+	url = https://github.com/yksz/serialport.git
+[submodule "vendor/getopty"]
+	path = vendor/getopty
+	url = https://github.com/yksz/getopty.git
