@@ -4,3 +4,6 @@
 [submodule "vendor/c-logger"]
 	path = vendor/c-logger
 	url = https://github.com/yksz/c-logger.git
+[submodule "vendor/getopty"]
+	path = vendor/getopty
+	url = https://github.com/yksz/getopty.git

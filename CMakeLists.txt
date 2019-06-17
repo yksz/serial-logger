@@ -20,6 +20,7 @@ include_directories(
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/vendor/serialport/src
     ${PROJECT_SOURCE_DIR}/vendor/c-logger/src
+    ${PROJECT_SOURCE_DIR}/vendor/getopty
 )
 file(GLOB source_files
     ${PROJECT_SOURCE_DIR}/src/*.cpp
