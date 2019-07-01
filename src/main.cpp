@@ -1,36 +1,54 @@
-#include <cstdio>
-#include <cstdlib>
-#include <map>
-#include <string>
-#include <vector>
+#include <stdio.h>
+#include <stdlib.h>
 #include "getopty.h"
 #include "logger.h"
 #include "serialevent.h"
 
-const uint32_t kDefaultBaudRate = 9600;
+const int kDefaultBaudRate = 9600;
+const long kDefaultMaxFileSize = 10000000; /* 10MB */
+const int kDefaultMaxBackupFiles = 10;
 
-static void showUsage(const std::string& name) {
-    printf("Usage: %s [option] <portname[:baudrate]>\n"
+static char* s_output;
+
+static void showUsage(const char* name)
+{
+    printf("Usage: %s [option] <portname> [baudrate]\n"
            "\n"
            "option:\n"
            "    -h        Show this help message\n"
            "    -o        Output the logs to a specified file\n"
-           "    -c        Configure the log settings using a specified setting file\n"
            ""
-           , name.c_str());
+           , name);
 }
 
-static std::vector<std::string> split(const std::string& s, char delim) {
-    std::vector<std::string> result;
-    std::stringstream stream(s);
-    std::string item;
-    while (std::getline(stream, item, delim)) {
-        result.push_back(item);
+static int parse(int argc, char** argv, char** portname, int* baudrate)
+{
+    struct opty opty = {0};
+    int opt;
+    while ((opt = getopty(argc, argv, "ho:", &opty)) != -1) {
+        switch (opt) {
+            case 'h':
+                showUsage(argv[0]);
+                break;
+            case 'o':
+                s_output= opty.arg;
+                break;
+            default:
+                break;
+        }
     }
-    return result;
+
+    if (argc - opty.ind <= 2) {
+        showUsage(argv[0]);
+        return 0; /* false */
+    }
+    *portname = argv[opty.ind + 0];
+    *baudrate = atoi(argv[opty.ind + 1]);
+    return 1; /* true */
 }
 
-static void onSerialDataReceived(SerialPort* serial) {
+static void onSerialDataReceived(SerialPort* serial)
+{
     char buf[8192] = {0};
     int nbytes;
 
@@ -40,50 +58,32 @@ static void onSerialDataReceived(SerialPort* serial) {
     }
 }
 
-int main(int argc, char** argv) {
-    char* portname = "/dev/ttyUSB0";
-    int baudrate = 115200;
+int main(int argc, char** argv)
+{
+    SerialPort serial = {0};
+    char* portname = NULL;
+    int baudrate = 0;
 
-    struct opty opty = {0};
-    int opt;
-    while ((opt = getopty(argc, argv, "hc:o:", &opty)) != -1) {
-        switch (opt) {
-            case 'h':
-                showUsage(argv[0]);
-                break;
-
-            case 'c':
-                printf("opt: c=%s\n", opty.arg);
-                break;
-
-            case 'o':
-                printf("opt: o=%s\n", opty.arg);
-                break;
-
-            default:
-                break;
-        }
+    int ok = parse(argc, argv, &portname, &baudrate);
+    if (!ok) {
+        return 1;
+    }
+    if (baudrate <= 0) {
+        baudrate = kDefaultBaudRate;
+    }
+    if (s_output == NULL) {
+        logger_initConsoleLogger(stdout);
+    } else {
+        logger_initFileLogger(s_output, kDefaultMaxFileSize, kDefaultMaxBackupFiles);
     }
 
-    for (int i = opty.ind; i < argc; i++) {
-        printf("arg: %s\n", argv[i]);
+    serialevent_set(onSerialDataReceived);
+    if (SerialPort_open(&serial, portname, baudrate) != 0) {
+        LOG_ERROR("Failed to open serial port: '%s:%d'", portname, baudrate);
+        return 1;
     }
-
-
-
-//    logger_initConsoleLogger(stdout);
-//    serialevent_set(onSerialDataReceived);
-//
-//    SerialPort serial = {0};
-//    if (SerialPort_open(&serial, portname, baudrate) != 0) {
-//        LOG_ERROR("Could not open");
-//        return 1;
-//    }
-//    serialevent_add(&serial);
-//
-//    LOG_INFO("start!");
-//    serialevent_start();
-//
-//    SerialPort_close(&serial);
+    serialevent_add(&serial);
+    serialevent_start();
+    SerialPort_close(&serial);
     return 0;
 }
