@@ -29,7 +29,7 @@ static int parse(int argc, char** argv, char** portname, int* baudrate)
         switch (opt) {
             case 'h':
                 showUsage(argv[0]);
-                break;
+                return 0; /* false */
             case 'o':
                 s_output= opty.arg;
                 break;
@@ -38,7 +38,7 @@ static int parse(int argc, char** argv, char** portname, int* baudrate)
         }
     }
 
-    if (argc - opty.ind <= 2) {
+    if (argc - opty.ind < 2) {
         showUsage(argv[0]);
         return 0; /* false */
     }
@@ -49,21 +49,32 @@ static int parse(int argc, char** argv, char** portname, int* baudrate)
 
 static void onSerialDataReceived(SerialPort* serial)
 {
-    char buf[8192] = {0};
-    int nbytes;
+    static char line[8192];
+    static int pos;
 
-    nbytes = SerialPort_read(serial, buf, sizeof(buf) - 1);
-    if (nbytes > 0) {
-        LOG_INFO("%s", buf);
+    int nbytes = SerialPort_read(serial, &line[pos], 1);
+    if (nbytes <= 0) {
+        return;
+    }
+    if (line[pos] == '\n') {
+        line[pos] = '\0'; /* overwrite */
+        LOG_INFO("%s", line);
+        pos = 0;
+        return;
+    }
+    pos += nbytes;
+    if (pos + 1 >= sizeof(line)) { /* full */
+        line[pos] = '\0'; 
+        LOG_INFO("%s", line);
+        pos = 0;
+        return;
     }
 }
 
 int main(int argc, char** argv)
 {
-    SerialPort serial = {0};
     char* portname = NULL;
     int baudrate = 0;
-
     int ok = parse(argc, argv, &portname, &baudrate);
     if (!ok) {
         return 1;
@@ -77,12 +88,13 @@ int main(int argc, char** argv)
         logger_initFileLogger(s_output, kDefaultMaxFileSize, kDefaultMaxBackupFiles);
     }
 
-    serialevent_set(onSerialDataReceived);
+    SerialPort serial = {0};
     if (SerialPort_open(&serial, portname, baudrate) != 0) {
         LOG_ERROR("Failed to open serial port: '%s:%d'", portname, baudrate);
         return 1;
     }
     serialevent_add(&serial);
+    serialevent_set(onSerialDataReceived);
     serialevent_start();
     SerialPort_close(&serial);
     return 0;
